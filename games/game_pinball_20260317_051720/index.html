@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弹球游戏 - Pinball</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+            min-width: 180px;
+            backdrop-filter: blur(10px);
+        }
+
+        .sidebar h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00d4ff;
+            text-shadow: 0 0 10px #00d4ff;
+        }
+
+        .score-display {
+            font-size: 36px;
+            font-weight: bold;
+            text-align: center;
+            color: #ffd700;
+            text-shadow: 0 0 15px #ffd700;
+            margin-bottom: 20px;
+        }
+
+        .lives-display {
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .lives-display span {
+            color: #ff4757;
+        }
+
+        .high-score {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #aaa;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-restart {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            color: white;
+        }
+
+        .btn-restart:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+
+        .btn-launch {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a5a);
+            color: white;
+        }
+
+        .btn-launch:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+        }
+
+        .instructions {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #888;
+            line-height: 1.6;
+        }
+
+        .instructions h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        #gameCanvas {
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .game-over-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .game-over-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            color: white;
+            border: 2px solid #00d4ff;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+        }
+
+        .game-over-content h1 {
+            color: #ff4757;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #ff4757;
+        }
+
+        .game-over-content p {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+
+        .combo-display {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 10px #ffd700;
+            pointer-events: none;
+            animation: fadeUp 1s ease-out forwards;
+        }
+
+        @keyframes fadeUp {
+            0% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="sidebar">
+            <h2>弹球游戏</h2>
+            <div class="score-display" id="score">0</div>
+            <div class="lives-display">生命: <span id="lives">3</span></div>
+            <div class="high-score">最高分: <span id="highScore">0</span></div>
+            <button class="btn btn-launch" id="launchBtn" onclick="launchBall()">发射球 (空格)</button>
+            <button class="btn btn-restart" onclick="restartGame()">重新开始</button>
+            <div class="instructions">
+                <h3>操作说明</h3>
+                <p>A / 左箭头 - 左挡板</p>
+                <p>D / 右箭头 - 右挡板</p>
+                <p>空格 - 发射球</p>
+                <p>碰撞障碍物得分!</p>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="500" height="700"></canvas>
+    </div>
+
+    <div class="game-over-overlay" id="gameOverOverlay">
+        <div class="game-over-content">
+            <h1>游戏结束!</h1>
+            <p>最终得分: <span id="finalScore">0</span></p>
+            <button class="btn btn-restart" onclick="restartGame()">再玩一次</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 游戏状态
+        let score = 0;
+        let lives = 3;
+        let highScore = localStorage.getItem('pinballHighScore') || 0;
+        let gameRunning = false;
+        let ballLaunched = false;
+
+        // 物理常量
+        const GRAVITY = 0.15;
+        const FRICTION = 0.99;
+        const BOUNCE = 0.8;
+
+        // 球
+        let ball = {
+            x: 470,
+            y: 600,
+            vx: 0,
+            vy: 0,
+            radius: 10,
+            color: '#fff'
+        };
+
+        // 挡板
+        const flippers = {
+            left: {
+                x: 130,
+                y: 620,
+                width: 80,
+                height: 15,
+                angle: 0.3,
+                targetAngle: 0.3,
+                pivotX: 130,
+                pivotY: 620
+            },
+            right: {
+                x: 290,
+                y: 620,
+                width: 80,
+                height: 15,
+                angle: Math.PI - 0.3,
+                targetAngle: Math.PI - 0.3,
+                pivotX: 370,
+                pivotY: 620
+            }
+        };
+
+        // 障碍物 (bumpers)
+        const bumpers = [
+            { x: 150, y: 200, radius: 35, color: '#ff6b6b', points: 100 },
+            { x: 250, y: 150, radius: 35, color: '#ffd700', points: 100 },
+            { x: 350, y: 200, radius: 35, color: '#00d4ff', points: 100 },
+            { x: 200, y: 300, radius: 30, color: '#ff9ff3', points: 50 },
+            { x: 300, y: 300, radius: 30, color: '#54a0ff', points: 50 },
+            { x: 250, y: 400, radius: 25, color: '#5f27cd', points: 25 }
+        ];
+
+        // 墙壁和边界
+        const walls = [
+            // 左侧斜坡
+            { x1: 0, y1: 500, x2: 80, y2: 580 },
+            // 右侧斜坡
+            { x1: 420, y1: 580, x2: 500, y2: 500 },
+            // 顶部弧形墙壁
+            { x1: 50, y1: 50, x2: 0, y2: 150 },
+            { x1: 450, y1: 50, x2: 500, y2: 150 }
+        ];
+
+        // 发射通道
+        const launcher = {
+            x: 460,
+            y: 650,
+            width: 30,
+            height: 50,
+            power: 0,
+            maxPower: 20,
+            charging: false
+        };
+
+        // 按键状态
+        const keys = {
+            left: false,
+            right: false,
+            space: false
+        };
+
+        // 初始化
+        document.getElementById('highScore').textContent = highScore;
+
+        // 事件监听
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+                keys.left = true;
+            }
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+                keys.right = true;
+            }
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (!ballLaunched) {
+                    launcher.charging = true;
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+                keys.left = false;
+            }
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+                keys.right = false;
+            }
+            if (e.key === ' ') {
+                if (launcher.charging && !ballLaunched) {
+                    launchBall();
+                }
+                launcher.charging = false;
+            }
+        });
+
+        // 发射球
+        function launchBall() {
+            if (!ballLaunched) {
+                ball.vy = -15 - launcher.power;
+                ball.vx = -2;
+                ballLaunched = true;
+                gameRunning = true;
+                launcher.power = 0;
+                document.getElementById('launchBtn').disabled = true;
+            }
+        }
+
+        // 重置球
+        function resetBall() {
+            ball.x = 470;
+            ball.y = 600;
+            ball.vx = 0;
+            ball.vy = 0;
+            ballLaunched = false;
+            launcher.power = 0;
+            document.getElementById('launchBtn').disabled = false;
+        }
+
+        // 重新开始游戏
+        function restartGame() {
+            score = 0;
+            lives = 3;
+            document.getElementById('score').textContent = score;
+            document.getElementById('lives').textContent = lives;
+            document.getElementById('gameOverOverlay').style.display = 'none';
+            resetBall();
+            gameRunning = false;
+        }
+
+        // 游戏结束
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverOverlay').style.display = 'flex';
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('pinballHighScore', highScore);
+                document.getElementById('highScore').textContent = highScore;
+            }
+        }
+
+        // 添加分数
+        function addScore(points, x, y) {
+            score += points;
+            document.getElementById('score').textContent = score;
+
+            // 显示得分动画
+            showScorePopup(points, x, y);
+        }
+
+        // 显示得分弹窗
+        function showScorePopup(points, x, y) {
+            const popup = document.createElement('div');
+            popup.className = 'combo-display';
+            popup.textContent = '+' + points;
+            popup.style.left = (canvas.offsetLeft + x) + 'px';
+            popup.style.top = (canvas.offsetTop + y) + 'px';
+            document.body.appendChild(popup);
+
+            setTimeout(() => popup.remove(), 1000);
+        }
+
+        // 碰撞检测 - 圆形
+        function circleCollision(ball, bumper) {
+            const dx = ball.x - bumper.x;
+            const dy = ball.y - bumper.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < ball.radius + bumper.radius) {
+                // 计算碰撞法线
+                const nx = dx / distance;
+                const ny = dy / distance;
+
+                // 反弹
+                const dotProduct = ball.vx * nx + ball.vy * ny;
+                ball.vx = (ball.vx - 2 * dotProduct * nx) * BOUNCE;
+                ball.vy = (ball.vy - 2 * dotProduct * ny) * BOUNCE;
+
+                // 分离球
+                const overlap = ball.radius + bumper.radius - distance;
+                ball.x += nx * overlap;
+                ball.y += ny * overlap;
+
+                // 添加额外推力
+                ball.vx += nx * 5;
+                ball.vy += ny * 5;
+
+                return true;
+            }
+            return false;
+        }
+
+        // 挡板碰撞
+        function flipperCollision(flipper, isLeft) {
+            const cos = Math.cos(flipper.angle);
+            const sin = Math.sin(flipper.angle);
+
+            // 挡板端点
+            let endX, endY;
+            if (isLeft) {
+                endX = flipper.pivotX + cos * flipper.width;
+                endY = flipper.pivotY + sin * flipper.width;
+            } else {
+                endX = flipper.pivotX - cos * flipper.width;
+                endY = flipper.pivotY + sin * flipper.width;
+            }
+
+            // 点到线段的距离
+            const dx = endX - flipper.pivotX;
+            const dy = endY - flipper.pivotY;
+            const len = Math.sqrt(dx * dx + dy * dy);
+
+            for (let t = 0; t <= 1; t += 0.1) {
+                const px = flipper.pivotX + dx * t;
+                const py = flipper.pivotY + dy * t;
+
+                const distX = ball.x - px;
+                const distY = ball.y - py;
+                const dist = Math.sqrt(distX * distX + distY * distY);
+
+                if (dist < ball.radius + flipper.height / 2) {
+                    // 碰撞响应
+                    const nx = distX / dist;
+                    const ny = distY / dist;
+
+                    const dotProduct = ball.vx * nx + ball.vy * ny;
+                    ball.vx = (ball.vx - 2 * dotProduct * nx) * BOUNCE;
+                    ball.vy = (ball.vy - 2 * dotProduct * ny) * BOUNCE;
+
+                    // 挡板运动给予额外速度
+                    if ((isLeft && keys.left) || (!isLeft && keys.right)) {
+                        ball.vy -= 8;
+                        ball.vx += isLeft ? 3 : -3;
+                    }
+
+                    // 分离
+                    ball.x = px + nx * (ball.radius + flipper.height / 2 + 1);
+                    ball.y = py + ny * (ball.radius + flipper.height / 2 + 1);
+
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 更新挡板
+        function updateFlippers() {
+            // 左挡板
+            if (keys.left) {
+                flippers.left.targetAngle = -0.5;
+            } else {
+                flippers.left.targetAngle = 0.3;
+            }
+
+            // 右挡板
+            if (keys.right) {
+                flippers.right.targetAngle = Math.PI + 0.5;
+            } else {
+                flippers.right.targetAngle = Math.PI - 0.3;
+            }
+
+            // 平滑移动
+            flippers.left.angle += (flippers.left.targetAngle - flippers.left.angle) * 0.3;
+            flippers.right.angle += (flippers.right.targetAngle - flippers.right.angle) * 0.3;
+        }
+
+        // 更新发射器
+        function updateLauncher() {
+            if (launcher.charging && !ballLaunched) {
+                launcher.power = Math.min(launcher.power + 0.5, launcher.maxPower);
+            }
+        }
+
+        // 更新球
+        function updateBall() {
+            if (!gameRunning || !ballLaunched) return;
+
+            // 重力
+            ball.vy += GRAVITY;
+
+            // 摩擦力
+            ball.vx *= FRICTION;
+            ball.vy *= FRICTION;
+
+            // 移动
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // 边界碰撞
+            // 左墙
+            if (ball.x - ball.radius < 0) {
+                ball.x = ball.radius;
+                ball.vx = -ball.vx * BOUNCE;
+            }
+            // 右墙（考虑发射通道）
+            if (ball.x + ball.radius > 440 && ball.y < 550) {
+                ball.x = 440 - ball.radius;
+                ball.vx = -ball.vx * BOUNCE;
+            }
+            // 顶部
+            if (ball.y - ball.radius < 0) {
+                ball.y = ball.radius;
+                ball.vy = -ball.vy * BOUNCE;
+            }
+            // 底部 - 失去生命
+            if (ball.y > canvas.height + 50) {
+                lives--;
+                document.getElementById('lives').textContent = lives;
+
+                if (lives <= 0) {
+                    gameOver();
+                } else {
+                    resetBall();
+                }
+            }
+
+            // 斜坡碰撞
+            // 左斜坡
+            if (ball.x < 100 && ball.y > 500) {
+                const slopeY = 500 + (ball.x / 80) * 80;
+                if (ball.y > slopeY - ball.radius) {
+                    ball.y = slopeY - ball.radius;
+                    ball.vy = -Math.abs(ball.vy) * BOUNCE;
+                    ball.vx += 2;
+                }
+            }
+            // 右斜坡
+            if (ball.x > 400 && ball.y > 500 && ball.x < 440) {
+                const slopeY = 500 + ((440 - ball.x) / 60) * 80;
+                if (ball.y > slopeY - ball.radius) {
+                    ball.y = slopeY - ball.radius;
+                    ball.vy = -Math.abs(ball.vy) * BOUNCE;
+                    ball.vx -= 2;
+                }
+            }
+
+            // 障碍物碰撞
+            bumpers.forEach(bumper => {
+                if (circleCollision(ball, bumper)) {
+                    addScore(bumper.points, bumper.x, bumper.y);
+                    bumper.hit = true;
+                    setTimeout(() => bumper.hit = false, 100);
+                }
+            });
+
+            // 挡板碰撞
+            flipperCollision(flippers.left, true);
+            flipperCollision(flippers.right, false);
+        }
+
+        // 绘制背景
+        function drawBackground() {
+            // 渐变背景
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#0f0f1e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 边框
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(5, 5, 430, 690);
+
+            // 发射通道
+            ctx.fillStyle = '#2a2a4e';
+            ctx.fillRect(440, 100, 60, 600);
+            ctx.strokeStyle = '#00d4ff';
+            ctx.strokeRect(440, 100, 60, 600);
+        }
+
+        // 绘制斜坡
+        function drawSlopes() {
+            ctx.beginPath();
+            ctx.moveTo(0, 500);
+            ctx.lineTo(80, 580);
+            ctx.lineTo(80, 700);
+            ctx.lineTo(0, 700);
+            ctx.closePath();
+            ctx.fillStyle = '#2a2a4e';
+            ctx.fill();
+            ctx.strokeStyle = '#00d4ff';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(440, 580);
+            ctx.lineTo(500, 500);
+            ctx.lineTo(500, 700);
+            ctx.lineTo(440, 700);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // 绘制障碍物
+        function drawBumpers() {
+            bumpers.forEach(bumper => {
+                // 外圈
+                ctx.beginPath();
+                ctx.arc(bumper.x, bumper.y, bumper.radius + 5, 0, Math.PI * 2);
+                ctx.fillStyle = bumper.hit ? '#fff' : 'rgba(255, 255, 255, 0.2)';
+                ctx.fill();
+
+                // 内圈
+                ctx.beginPath();
+                ctx.arc(bumper.x, bumper.y, bumper.radius, 0, Math.PI * 2);
+
+                const gradient = ctx.createRadialGradient(
+                    bumper.x - 10, bumper.y - 10, 0,
+                    bumper.x, bumper.y, bumper.radius
+                );
+                gradient.addColorStop(0, '#fff');
+                gradient.addColorStop(0.5, bumper.color);
+                gradient.addColorStop(1, bumper.color);
+
+                ctx.fillStyle = bumper.hit ? '#fff' : gradient;
+                ctx.fill();
+
+                // 分数标记
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(bumper.points, bumper.x, bumper.y);
+
+                // 发光效果
+                if (bumper.hit) {
+                    ctx.shadowColor = bumper.color;
+                    ctx.shadowBlur = 30;
+                    ctx.beginPath();
+                    ctx.arc(bumper.x, bumper.y, bumper.radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+            });
+        }
+
+        // 绘制挡板
+        function drawFlippers() {
+            // 左挡板
+            ctx.save();
+            ctx.translate(flippers.left.pivotX, flippers.left.pivotY);
+            ctx.rotate(flippers.left.angle);
+
+            ctx.beginPath();
+            ctx.roundRect(0, -flippers.left.height / 2, flippers.left.width, flippers.left.height, 8);
+            const leftGradient = ctx.createLinearGradient(0, 0, 0, flippers.left.height);
+            leftGradient.addColorStop(0, '#ff6b6b');
+            leftGradient.addColorStop(1, '#ee5a5a');
+            ctx.fillStyle = leftGradient;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
+
+            // 右挡板
+            ctx.save();
+            ctx.translate(flippers.right.pivotX, flippers.right.pivotY);
+            ctx.rotate(flippers.right.angle - Math.PI);
+
+            ctx.beginPath();
+            ctx.roundRect(0, -flippers.right.height / 2, flippers.right.width, flippers.right.height, 8);
+            const rightGradient = ctx.createLinearGradient(0, 0, 0, flippers.right.height);
+            rightGradient.addColorStop(0, '#ff6b6b');
+            rightGradient.addColorStop(1, '#ee5a5a');
+            ctx.fillStyle = rightGradient;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
+
+            // 挡板支点
+            ctx.beginPath();
+            ctx.arc(flippers.left.pivotX, flippers.left.pivotY, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffd700';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(flippers.right.pivotX, flippers.right.pivotY, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffd700';
+            ctx.fill();
+        }
+
+        // 绘制球
+        function drawBall() {
+            // 发光效果
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 15;
+
+            // 球体
+            const gradient = ctx.createRadialGradient(
+                ball.x - 3, ball.y - 3, 0,
+                ball.x, ball.y, ball.radius
+            );
+            gradient.addColorStop(0, '#fff');
+            gradient.addColorStop(0.5, '#ccc');
+            gradient.addColorStop(1, '#888');
+
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+        }
+
+        // 绘制发射器
+        function drawLauncher() {
+            // 发射通道底部
+            ctx.fillStyle = '#3a3a5e';
+            ctx.fillRect(445, 640, 50, 60);
+
+            // 发射弹簧
+            const springHeight = 40 - launcher.power * 2;
+            ctx.fillStyle = launcher.charging ? '#ff6b6b' : '#888';
+            ctx.fillRect(455, 650 + (40 - springHeight), 30, springHeight);
+
+            // 力度指示器
+            if (launcher.charging) {
+                ctx.fillStyle = `hsl(${120 - launcher.power * 6}, 100%, 50%)`;
+                ctx.fillRect(450, 630, 40, 5);
+            }
+        }
+
+        // 绘制装饰
+        function drawDecorations() {
+            // 顶部装饰灯
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.arc(100 + i * 60, 80, 10, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${(Date.now() / 10 + i * 50) % 360}, 100%, 50%)`;
+                ctx.fill();
+            }
+
+            // 侧边装饰
+            ctx.fillStyle = 'rgba(0, 212, 255, 0.1)';
+            ctx.fillRect(10, 100, 5, 400);
+            ctx.fillRect(425, 100, 5, 400);
+        }
+
+        // 游戏循环
+        function gameLoop() {
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 更新
+            updateFlippers();
+            updateLauncher();
+            updateBall();
+
+            // 绘制
+            drawBackground();
+            drawSlopes();
+            drawDecorations();
+            drawBumpers();
+            drawFlippers();
+            drawLauncher();
+            drawBall();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 启动游戏
+        gameLoop();
+    </script>
+</body>
+</html>
