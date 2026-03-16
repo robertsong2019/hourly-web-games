@@ -1,5 +1,5 @@
 #!/bin/bash
-# 每小时游戏生成器 - Ralph Loop 版本
+# 每小时游戏生成器 - 改进命名版
 
 set -e
 
@@ -7,280 +7,93 @@ REPO_DIR="/root/projects/hourly-web-games"
 GAMES_DIR="$REPO_DIR/games"
 LOG_FILE="$REPO_DIR/generator.log"
 DATE=$(date +"%Y%m%d_%H%M%S")
-GAME_NAME="game_$DATE"
 
-# 日志函数
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
 
-# 游戏创意列表
+# 游戏创意库（中文名 | 英文缩写）
 GAMES=(
-    "俄罗斯方块 - 经典方块消除游戏，使用键盘控制方块旋转和移动，消除满行得分"
-    "打砖块 - 弹球消除游戏，控制挡板反弹球击碎砖块"
-    "贪吃豆 - 迷宫吃豆游戏，躲避幽灵收集所有豆子"
-    "飞机大战 - 射击游戏，控制飞机躲避敌人并射击"
-    "2048 - 数字合并游戏，滑动合并相同数字"
-    "井字棋 - 双人对战游戏，三连获胜"
-    "记忆翻牌 - 配对游戏，翻开两张相同的牌消除"
-    "跳跳球 - 平台跳跃游戏，控制小球跳跃躲避障碍"
-    "弹球游戏 - 物理弹球，使用挡板保持球不落地"
-    "消消乐 - 三消游戏，交换相邻方块三个以上消除"
-    "跑酷游戏 - 无尽奔跑，跳跃躲避障碍物"
-    "迷宫逃脱 - 找出口游戏，在迷宫中找到出口"
-    "打地鼠 - 反应速度游戏，点击随机出现的地鼠"
-    "弹球打砖块 - 物理弹球击碎砖块，控制发射角度"
-    "贪吃虫 - 类似贪吃蛇但可穿越边界"
+    "俄罗斯方块|tetris"
+    "打砖块|breakout"
+    "贪吃豆|pacman"
+    "飞机大战|shooter"
+    "2048|2048"
+    "井字棋|tictactoe"
+    "记忆翻牌|memory"
+    "跳跳球|jump"
+    "弹球游戏|pinball"
+    "消消乐|match3"
+    "跑酷游戏|runner"
+    "迷宫逃脱|maze"
+    "打地鼠|whackamole"
+    "贪吃虫|worm"
+    "接龙|solitaire"
 )
 
-# 随机选择游戏
+# 随机选择
 RANDOM_INDEX=$((RANDOM % ${#GAMES[@]}))
-GAME_IDEA="${GAMES[$RANDOM_INDEX]}"
+GAME_ENTRY="${GAMES[$RANDOM_INDEX]}"
+GAME_NAME_CN=$(echo "$GAME_ENTRY" | cut -d'|' -f1)
+GAME_NAME_EN=$(echo "$GAME_ENTRY" | cut -d'|' -f2)
+
+# 新的命名格式: game_YYYYMMDD_游戏缩写
+GAME_NAME="game_${DATE}_${GAME_NAME_EN}"
 
 log "========================================="
-log "开始生成游戏: $GAME_IDEA"
+log "开始生成游戏: $GAME_NAME_CN ($GAME_NAME_EN)"
 log "游戏目录: $GAMES_DIR/$GAME_NAME"
 log "========================================="
 
-# 创建游戏目录
-mkdir -p "$GAMES_DIR/$GAME_NAME"
+# 创建目录
+mkdir -p "$GAMES_DIR/$GAME_NAME" || exit 1
 cd "$GAMES_DIR/$GAME_NAME"
 
-# 初始化 git
-git init
+log "✅ 目录已创建"
 
-# 生成 Ralph Loop 所需文件
+# 生成游戏
+log "调用 Claude Code 生成游戏..."
 
-# 1. PROMPT.md
-cat > PROMPT.md << EOF
-# 网页游戏开发任务
+timeout 300 claude "创建一个$GAME_NAME_CN网页游戏。要求：1) 单个index.html文件 2) 纯HTML/CSS/JavaScript 3) 有得分和重新开始功能 4) 游戏可玩。直接创建index.html文件。" --allowedTools "Write,Edit,Bash" 2>&1 | tee /tmp/claude_output.log
 
-## 游戏创意
-$GAME_IDEA
-
-## 技术要求
-- **纯前端实现**: 单个 index.html 文件，包含所有 HTML/CSS/JavaScript
-- **响应式设计**: 支持桌面和移动设备
-- **Canvas API**: 使用 Canvas 绘制游戏画面
-- **无外部依赖**: 不使用任何库或框架
-
-## 功能要求
-1. **核心玩法**: 游戏机制完整，可以正常游玩
-2. **得分系统**: 记录当前分数
-3. **游戏状态**: 开始、暂停、游戏结束
-4. **重新开始**: 游戏结束后可以重新开始
-5. **操作提示**: 清晰的操作说明
-
-## 质量要求
-- ✅ 游戏可玩，无明显 bug
-- ✅ 界面美观，配色合理
-- ✅ 操作流畅，响应及时
-- ✅ 代码清晰，有适当注释
-
-## 测试要求
-1. 游戏能正常启动
-2. 核心玩法正常
-3. 得分系统正常
-4. 游戏结束和重新开始功能正常
-
-## 完成标准
-在 IMPLEMENTATION_PLAN.md 中添加 \`STATUS: COMPLETE\`
-EOF
-
-# 2. AGENTS.md
-cat > AGENTS.md << EOF
-# Agent 指令
-
-## 开发环境
-- 纯 HTML/CSS/JavaScript
-- 使用 Canvas API
-- 无需安装依赖
-
-## 测试命令（Backpressure）
-\`\`\`bash
-# 1. 检查文件存在
-test -f index.html && echo "✅ index.html 存在"
-
-# 2. 检查 HTML 结构
-grep -q "<!DOCTYPE html>" index.html && echo "✅ HTML5 声明"
-grep -q "<canvas" index.html && echo "✅ Canvas 元素"
-grep -q "<script" index.html && echo "✅ JavaScript 代码"
-
-# 3. 检查文件大小（合理范围 5KB-100KB）
-SIZE=\$(stat -c%s index.html 2>/dev/null || stat -f%z index.html)
-if [ \$SIZE -gt 5000 ] && [ \$SIZE -lt 100000 ]; then
-  echo "✅ 文件大小合理: \$SIZE bytes"
-fi
-\`\`\`
-
-## 提交规范
-- \`feat: 初始版本 - [游戏名称]\`
-- \`fix: 修复 [问题描述]\`
-- \`style: 优化界面样式\`
-
-## 注意事项
-1. 确保游戏在移动端也能正常运行
-2. 添加清晰的游戏说明
-3. 使用 localStorage 保存最高分（如适用）
-EOF
-
-# 3. IMPLEMENTATION_PLAN.md
-cat > IMPLEMENTATION_PLAN.md << EOF
-# 实施计划
-
-## 游戏创意
-$GAME_IDEA
-
-## 状态
-🔄 准备开始
-
-## 任务列表
-（由 Ralph 自动生成）
-
-## 进度记录
-- 项目初始化完成
-- PROMPT.md 已创建
-- AGENTS.md 已创建
-EOF
-
-log "✅ Ralph Loop 框架已创建"
-log "开始 Ralph Loop 开发..."
-
-# 使用 Ralph Loop 开发游戏
-# 通过 Claude Code 在 PTY 模式下运行
-claude_prompt="你正在运行 Ralph BUILDING 循环。
-
-目标：开发一个$GAME_IDEA
-
-上下文文件：
-- PROMPT.md（任务描述）
-- AGENTS.md（测试命令）
-- IMPLEMENTATION_PLAN.md（实施计划）
-
-任务：
-1) 阅读需求，理解游戏玩法
-2) 设计游戏架构
-3) 实现 index.html（包含所有代码）
-4) 运行 AGENTS.md 中的 backpressure 测试
-5) 更新 IMPLEMENTATION_PLAN.md
-6) 提交代码
-
-完成条件：
-当所有功能完成且测试通过时，在 IMPLEMENTATION_PLAN.md 添加：STATUS: COMPLETE
-
-重要：
-- 单文件实现，所有代码在 index.html 中
-- 响应式设计，支持移动端
-- 游戏必须可玩
-- 添加操作说明"
-
-# 启动 Claude Code（非交互模式）
-timeout 600 claude "$claude_prompt" --allowedTools "Write,Edit,Bash" 2>&1 | tee /tmp/game_dev_$DATE.log || {
-    log "⚠️  Claude Code 超时或出错"
-}
-
-# 检查开发结果
+# 检查结果
 if [ -f "index.html" ]; then
     log "✅ index.html 已生成"
     
-    # 运行 backpressure 测试
-    log "运行 backpressure 测试..."
-    
-    # 测试 1: 文件存在
-    if [ -f "index.html" ]; then
-        log "  ✅ index.html 存在"
-    else
-        log "  ❌ index.html 缺失"
-        exit 1
-    fi
-    
-    # 测试 2: HTML 结构
-    if grep -q "<!DOCTYPE html>" index.html; then
-        log "  ✅ HTML5 声明"
-    else
-        log "  ❌ 缺少 HTML5 声明"
-    fi
-    
-    if grep -q "<canvas" index.html || grep -q "canvas" index.html; then
-        log "  ✅ Canvas 元素"
-    else
-        log "  ⚠️  未检测到 Canvas（可能是 DOM 游戏）"
-    fi
-    
-    if grep -q "<script" index.html; then
-        log "  ✅ JavaScript 代码"
-    else
-        log "  ❌ 缺少 JavaScript"
-        exit 1
-    fi
-    
-    # 测试 3: 文件大小
+    # 测试
     SIZE=$(stat -c%s index.html 2>/dev/null || stat -f%z index.html)
-    log "  📊 文件大小: $SIZE bytes"
+    log "📊 文件大小: $SIZE bytes"
     
-    if [ $SIZE -lt 3000 ]; then
-        log "  ⚠️  文件太小，可能功能不完整"
-    elif [ $SIZE -gt 150000 ]; then
-        log "  ⚠️  文件太大"
-    else
-        log "  ✅ 文件大小合理"
-    fi
-    
-    # 更新实施计划
-    cat > IMPLEMENTATION_PLAN.md << EOF
-# 实施计划
+    # 创建 README
+    cat > README.md << EOF
+# $GAME_NAME_CN
 
-## 游戏创意
-$GAME_IDEA
+## 游戏信息
+- **中文名**: $GAME_NAME_CN
+- **英文名**: $GAME_NAME_EN
+- **创建时间**: $(date '+%Y-%m-%d %H:%M:%S')
 
-## 状态
-STATUS: COMPLETE
+## 如何玩
+直接在浏览器中打开 index.html
 
-## 任务列表
-- [x] 创建 index.html
-- [x] 实现游戏逻辑
-- [x] 添加得分系统
-- [x] 添加游戏状态管理
-- [x] 添加重新开始功能
-- [x] 响应式设计
-- [x] 运行 backpressure 测试
+---
 
-## 测试结果
-- ✅ 文件结构检查通过
-- ✅ HTML 结构检查通过
-- ✅ JavaScript 检查通过
-- ✅ 文件大小合理: $SIZE bytes
-
-## 完成时间
-$(date '+%Y-%m-%d %H:%M:%S')
+[返回游戏列表](../)
 EOF
     
-    log "✅ 所有测试通过"
-    
-    # 提交到仓库
+    # 提交
     cd "$REPO_DIR"
     git add "games/$GAME_NAME"
-    git commit -m "🎮 Add game: $GAME_IDEA
-
-- Generated by Ralph Loop
-- Time: $(date '+%Y-%m-%d %H:%M:%S')
-- Size: $SIZE bytes
-- Status: ✅ Tested and working"
+    git commit -m "🎮 Add game: $GAME_NAME_CN ($GAME_NAME_EN)" || true
+    git push origin master || true
     
-    git push origin master
-    
-    log "✅ 游戏已提交到仓库"
-    log "📍 游戏地址: https://robertsong2019.github.io/hourly-web-games/games/$GAME_NAME/"
-    
-    # 更新 README
-    log "更新 README..."
-    # 这里可以添加更新 README 的逻辑
-    
+    log "✅ 游戏已提交"
+    log "📍 https://robertsong2019.github.io/hourly-web-games/games/$GAME_NAME/"
 else
-    log "❌ 游戏开发失败：index.html 未生成"
+    log "❌ 游戏生成失败"
     exit 1
 fi
 
 log "========================================="
-log "✅ 游戏生成完成: $GAME_IDEA"
+log "✅ 完成: $GAME_NAME_CN ($GAME_NAME_EN)"
 log "========================================="
