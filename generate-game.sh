@@ -1,5 +1,5 @@
 #!/bin/bash
-# 每小时游戏生成器 - 改进命名版
+# 每小时游戏生成器 - 改进命名版 v2
 
 set -e
 
@@ -37,8 +37,8 @@ GAME_ENTRY="${GAMES[$RANDOM_INDEX]}"
 GAME_NAME_CN=$(echo "$GAME_ENTRY" | cut -d'|' -f1)
 GAME_NAME_EN=$(echo "$GAME_ENTRY" | cut -d'|' -f2)
 
-# 新的命名格式: game_YYYYMMDD_游戏缩写
-GAME_NAME="game_${DATE}_${GAME_NAME_EN}"
+# 新的命名格式: game_游戏缩写_YYYYMMDD_HHMMSS（日期在最后）
+GAME_NAME="game_${GAME_NAME_EN}_${DATE}"
 
 log "========================================="
 log "开始生成游戏: $GAME_NAME_CN ($GAME_NAME_EN)"
