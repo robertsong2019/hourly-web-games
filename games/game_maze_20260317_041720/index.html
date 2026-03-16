@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>迷宫逃脱</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            color: #00ffff;
+        }
+
+        .game-info {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .info-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 25px;
+            border-radius: 25px;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+        }
+
+        .info-item span {
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        #gameCanvas {
+            border: 4px solid #00ffff;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            background: #0a0a1a;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        #restartBtn {
+            background: linear-gradient(135deg, #00ffff, #0080ff);
+            color: #000;
+        }
+
+        #restartBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        #newMazeBtn {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: #fff;
+        }
+
+        #newMazeBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+        }
+
+        .instructions {
+            margin-top: 20px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9em;
+        }
+
+        .instructions p {
+            margin: 5px 0;
+        }
+
+        .win-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .win-overlay.show {
+            display: flex;
+        }
+
+        .win-overlay h2 {
+            font-size: 3em;
+            color: #00ff00;
+            text-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
+            margin-bottom: 20px;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .win-overlay .stats {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+
+        .win-overlay button {
+            padding: 15px 40px;
+            font-size: 1.3em;
+        }
+
+        .mobile-controls {
+            display: none;
+            margin-top: 20px;
+            gap: 10px;
+        }
+
+        .mobile-controls .row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .mobile-btn {
+            width: 60px;
+            height: 60px;
+            font-size: 1.5em;
+            background: rgba(0, 255, 255, 0.2);
+            border: 2px solid #00ffff;
+            color: #00ffff;
+            border-radius: 10px;
+        }
+
+        .mobile-btn:active {
+            background: rgba(0, 255, 255, 0.5);
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .game-info {
+                gap: 15px;
+                font-size: 1em;
+            }
+
+            .info-item {
+                padding: 8px 15px;
+            }
+
+            .mobile-controls {
+                display: flex;
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>迷宫逃脱</h1>
+
+    <div class="game-info">
+        <div class="info-item">步数: <span id="steps">0</span></div>
+        <div class="info-item">时间: <span id="time">0</span>s</div>
+        <div class="info-item">关卡: <span id="level">1</span></div>
+    </div>
+
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+    <div class="controls">
+        <button id="restartBtn">重新开始</button>
+        <button id="newMazeBtn">新迷宫</button>
+    </div>
+
+    <div class="instructions">
+        <p>使用 ↑ ↓ ← → 或 W A S D 控制移动</p>
+        <p>找到绿色出口即可通关</p>
+    </div>
+
+    <div class="mobile-controls">
+        <div class="row">
+            <button class="mobile-btn" data-dir="up">↑</button>
+        </div>
+        <div class="row">
+            <button class="mobile-btn" data-dir="left">←</button>
+            <button class="mobile-btn" data-dir="down">↓</button>
+            <button class="mobile-btn" data-dir="right">→</button>
+        </div>
+    </div>
+
+    <div class="win-overlay" id="winOverlay">
+        <h2>恭喜通关!</h2>
+        <div class="stats">
+            <p>步数: <span id="finalSteps">0</span></p>
+            <p>用时: <span id="finalTime">0</span>秒</p>
+            <p>得分: <span id="finalScore">0</span></p>
+        </div>
+        <button id="nextLevelBtn">下一关</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 游戏配置
+        let cellSize;
+        let cols, rows;
+        let maze = [];
+        let player = { x: 0, y: 0 };
+        let exit = { x: 0, y: 0 };
+        let steps = 0;
+        let time = 0;
+        let level = 1;
+        let timer = null;
+        let gameWon = false;
+
+        // 根据关卡设置难度
+        function setDifficulty() {
+            if (level <= 3) {
+                cols = rows = 11;
+            } else if (level <= 6) {
+                cols = rows = 15;
+            } else {
+                cols = rows = 21;
+            }
+            cellSize = canvas.width / cols;
+        }
+
+        // 生成迷宫 (使用递归回溯算法)
+        function generateMaze() {
+            maze = [];
+            for (let y = 0; y < rows; y++) {
+                maze[y] = [];
+                for (let x = 0; x < cols; x++) {
+                    maze[y][x] = {
+                        visited: false,
+                        walls: { top: true, right: true, bottom: true, left: true }
+                    };
+                }
+            }
+
+            const stack = [];
+            let current = { x: 0, y: 0 };
+            maze[0][0].visited = true;
+
+            do {
+                const neighbors = getUnvisitedNeighbors(current.x, current.y);
+
+                if (neighbors.length > 0) {
+                    const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    stack.push(current);
+                    removeWall(current, next);
+                    current = next;
+                    maze[current.y][current.x].visited = true;
+                } else if (stack.length > 0) {
+                    current = stack.pop();
+                }
+            } while (stack.length > 0);
+
+            // 设置入口和出口
+            player = { x: 0, y: 0 };
+            exit = { x: cols - 1, y: rows - 1 };
+        }
+
+        function getUnvisitedNeighbors(x, y) {
+            const neighbors = [];
+
+            if (y > 0 && !maze[y - 1][x].visited) neighbors.push({ x, y: y - 1, dir: 'top' });
+            if (x < cols - 1 && !maze[y][x + 1].visited) neighbors.push({ x: x + 1, y, dir: 'right' });
+            if (y < rows - 1 && !maze[y + 1][x].visited) neighbors.push({ x, y: y + 1, dir: 'bottom' });
+            if (x > 0 && !maze[y][x - 1].visited) neighbors.push({ x: x - 1, y, dir: 'left' });
+
+            return neighbors;
+        }
+
+        function removeWall(current, next) {
+            const dx = next.x - current.x;
+            const dy = next.y - current.y;
+
+            if (dx === 1) {
+                maze[current.y][current.x].walls.right = false;
+                maze[next.y][next.x].walls.left = false;
+            } else if (dx === -1) {
+                maze[current.y][current.x].walls.left = false;
+                maze[next.y][next.x].walls.right = false;
+            } else if (dy === 1) {
+                maze[current.y][current.x].walls.bottom = false;
+                maze[next.y][next.x].walls.top = false;
+            } else if (dy === -1) {
+                maze[current.y][current.x].walls.top = false;
+                maze[next.y][next.x].walls.bottom = false;
+            }
+        }
+
+        // 绘制迷宫
+        function drawMaze() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制背景
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制路径
+            ctx.fillStyle = '#1a1a3e';
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    ctx.fillRect(x * cellSize + 2, y * cellSize + 2, cellSize - 4, cellSize - 4);
+                }
+            }
+
+            // 绘制墙壁
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const cell = maze[y][x];
+                    const px = x * cellSize;
+                    const py = y * cellSize;
+
+                    if (cell.walls.top) {
+                        ctx.beginPath();
+                        ctx.moveTo(px, py);
+                        ctx.lineTo(px + cellSize, py);
+                        ctx.stroke();
+                    }
+                    if (cell.walls.right) {
+                        ctx.beginPath();
+                        ctx.moveTo(px + cellSize, py);
+                        ctx.lineTo(px + cellSize, py + cellSize);
+                        ctx.stroke();
+                    }
+                    if (cell.walls.bottom) {
+                        ctx.beginPath();
+                        ctx.moveTo(px, py + cellSize);
+                        ctx.lineTo(px + cellSize, py + cellSize);
+                        ctx.stroke();
+                    }
+                    if (cell.walls.left) {
+                        ctx.beginPath();
+                        ctx.moveTo(px, py);
+                        ctx.lineTo(px, py + cellSize);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            // 绘制出口
+            const gradient = ctx.createRadialGradient(
+                exit.x * cellSize + cellSize / 2,
+                exit.y * cellSize + cellSize / 2,
+                0,
+                exit.x * cellSize + cellSize / 2,
+                exit.y * cellSize + cellSize / 2,
+                cellSize / 2
+            );
+            gradient.addColorStop(0, '#00ff00');
+            gradient.addColorStop(1, 'rgba(0, 255, 0, 0.3)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(
+                exit.x * cellSize + cellSize / 2,
+                exit.y * cellSize + cellSize / 2,
+                cellSize / 3,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+
+            // 绘制玩家
+            const playerGradient = ctx.createRadialGradient(
+                player.x * cellSize + cellSize / 2,
+                player.y * cellSize + cellSize / 2,
+                0,
+                player.x * cellSize + cellSize / 2,
+                player.y * cellSize + cellSize / 2,
+                cellSize / 2
+            );
+            playerGradient.addColorStop(0, '#ff6b6b');
+            playerGradient.addColorStop(1, '#ee5a24');
+            ctx.fillStyle = playerGradient;
+            ctx.beginPath();
+            ctx.arc(
+                player.x * cellSize + cellSize / 2,
+                player.y * cellSize + cellSize / 2,
+                cellSize / 3,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+
+            // 玩家光晕效果
+            ctx.shadowColor = '#ff6b6b';
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        // 移动玩家
+        function movePlayer(dx, dy) {
+            if (gameWon) return;
+
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+
+            // 检查边界
+            if (newX < 0 || newX >= cols || newY < 0 || newY >= rows) return;
+
+            // 检查墙壁
+            const currentCell = maze[player.y][player.x];
+
+            if (dx === 1 && currentCell.walls.right) return;
+            if (dx === -1 && currentCell.walls.left) return;
+            if (dy === 1 && currentCell.walls.bottom) return;
+            if (dy === -1 && currentCell.walls.top) return;
+
+            player.x = newX;
+            player.y = newY;
+            steps++;
+            updateDisplay();
+            drawMaze();
+
+            // 检查是否到达出口
+            if (player.x === exit.x && player.y === exit.y) {
+                winGame();
+            }
+        }
+
+        // 更新显示
+        function updateDisplay() {
+            document.getElementById('steps').textContent = steps;
+            document.getElementById('time').textContent = time;
+            document.getElementById('level').textContent = level;
+        }
+
+        // 开始计时器
+        function startTimer() {
+            if (timer) clearInterval(timer);
+            time = 0;
+            timer = setInterval(() => {
+                time++;
+                document.getElementById('time').textContent = time;
+            }, 1000);
+        }
+
+        // 游戏胜利
+        function winGame() {
+            gameWon = true;
+            clearInterval(timer);
+
+            // 计算得分 (步数越少、时间越短、关卡越高，得分越高)
+            const baseScore = 1000;
+            const stepPenalty = steps * 2;
+            const timePenalty = time * 1;
+            const levelBonus = level * 100;
+            const score = Math.max(0, baseScore - stepPenalty - timePenalty + levelBonus);
+
+            document.getElementById('finalSteps').textContent = steps;
+            document.getElementById('finalTime').textContent = time;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('winOverlay').classList.add('show');
+        }
+
+        // 重新开始当前关卡
+        function restartGame() {
+            gameWon = false;
+            player = { x: 0, y: 0 };
+            steps = 0;
+            document.getElementById('winOverlay').classList.remove('show');
+            updateDisplay();
+            startTimer();
+            drawMaze();
+        }
+
+        // 生成新迷宫
+        function newMaze() {
+            gameWon = false;
+            document.getElementById('winOverlay').classList.remove('show');
+            setDifficulty();
+            generateMaze();
+            steps = 0;
+            updateDisplay();
+            startTimer();
+            drawMaze();
+        }
+
+        // 下一关
+        function nextLevel() {
+            level++;
+            newMaze();
+        }
+
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    e.preventDefault();
+                    movePlayer(0, -1);
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    e.preventDefault();
+                    movePlayer(0, 1);
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    e.preventDefault();
+                    movePlayer(-1, 0);
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    e.preventDefault();
+                    movePlayer(1, 0);
+                    break;
+            }
+        });
+
+        // 按钮事件
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
+        document.getElementById('newMazeBtn').addEventListener('click', () => {
+            level = 1;
+            newMaze();
+        });
+        document.getElementById('nextLevelBtn').addEventListener('click', nextLevel);
+
+        // 移动端控制
+        document.querySelectorAll('.mobile-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const dir = btn.dataset.dir;
+                switch (dir) {
+                    case 'up': movePlayer(0, -1); break;
+                    case 'down': movePlayer(0, 1); break;
+                    case 'left': movePlayer(-1, 0); break;
+                    case 'right': movePlayer(1, 0); break;
+                }
+            });
+        });
+
+        // 初始化游戏
+        newMaze();
+    </script>
+</body>
+</html>
